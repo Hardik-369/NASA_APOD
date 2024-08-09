@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NASA APOD Explorer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #475569;
+            border-radius: 20px;
+        }
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        @media (max-width: 640px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-200 min-h-screen flex flex-col">
+    <div class="flex flex-col h-screen">
+        <header class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center">
+            <h1 class="text-xl font-semibold">NASA APOD Explorer</h1>
+            <button id="menuToggle" class="sm:hidden text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+            </button>
+        </header>
+
+        <main class="flex-grow flex overflow-hidden relative">
+            <aside id="sidebar" class="sidebar absolute sm:relative w-64 bg-gray-900 p-4 border-r border-gray-700 flex flex-col z-10 h-full sm:transform-none">
+                <div class="mb-4">
+                    <label for="datePicker" class="block text-sm font-medium mb-1">Select Date</label>
+                    <input type="date" id="datePicker" class="w-full p-2 rounded bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button id="fetchButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition duration-150 ease-in-out mb-4">
+                    Fetch APOD
+                </button>
+                <button id="userManualButton" class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded transition duration-150 ease-in-out">
+                    User Manual
+                </button>
+            </aside>
+
+            <section id="apodContainer" class="flex-grow p-4 sm:p-6 overflow-y-auto custom-scrollbar">
+                <!-- APOD content will be inserted here -->
+            </section>
+        </main>
+
+        <footer class="bg-gray-800 border-t border-gray-700 p-4 text-center text-sm text-gray-400">
+            Created by Hardik Kawale
+        </footer>
+    </div>
+
+    <!-- User Manual Modal -->
+    <div id="userManualModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+
+        <div class="modal-container bg-gray-800 w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">User Manual</p>
+                    <button id="closeModal" class="modal-close cursor-pointer z-50">
+                        <svg class="fill-current text-white" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="my-5">
+                    <h3 class="text-lg font-semibold mb-2">How to Use NASA APOD Explorer</h3>
+                    <ol class="list-decimal list-inside space-y-2">
+                        <li>On mobile, tap the menu icon to open the sidebar.</li>
+                        <li>Use the date picker in the sidebar to select a date.</li>
+                        <li>Click the "Fetch APOD" button to retrieve the Astronomy Picture of the Day for the selected date.</li>
+                        <li>The image and its details will be displayed in the main area.</li>
+                        <li>Scroll through the content to read the full explanation.</li>
+                        <li>To view a different date, simply select a new date and click "Fetch APOD" again.</li>
+                        <li>On mobile, tap outside the sidebar to close it and view the full image.</li>
+                    </ol>
+                    <p class="mt-4">Enjoy exploring the wonders of space through NASA's Astronomy Picture of the Day!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = '0DsTNqkMZLpR4prXPT9Y7mP2Zlo9lG1wSVc8s0rc'; // Replace with your actual API key
+        const API_URL = 'https://api.nasa.gov/planetary/apod';
+
+        const datePicker = document.getElementById('datePicker');
+        const fetchButton = document.getElementById('fetchButton');
+        const apodContainer = document.getElementById('apodContainer');
+        const userManualButton = document.getElementById('userManualButton');
+        const userManualModal = document.getElementById('userManualModal');
+        const closeModal = document.getElementById('closeModal');
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+
+        // Set the date picker's max value to today
+        const today = new Date().toISOString().split('T')[0];
+        datePicker.max = today;
+        datePicker.value = today;
+
+        fetchButton.addEventListener('click', fetchAPOD);
+        userManualButton.addEventListener('click', openModal);
+        closeModal.addEventListener('click', closeModalFunction);
+        userManualModal.querySelector('.modal-overlay').addEventListener('click', closeModalFunction);
+        menuToggle.addEventListener('click', toggleSidebar);
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+        }
+
+        function openModal() {
+            userManualModal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeModalFunction() {
+            userManualModal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        async function fetchAPOD() {
+            const date = datePicker.value;
+            const url = `${API_URL}?api_key=${API_KEY}&date=${date}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                displayAPOD(data);
+                if (window.innerWidth < 640) {
+                    sidebar.classList.remove('open');
+                }
+            } catch (error) {
+                console.error('Error fetching APOD:', error);
+                apodContainer.innerHTML = '<p class="text-red-500">Error fetching APOD. Please try again later.</p>';
+            }
+        }
+
+        function displayAPOD(apod) {
+            const content = `
+                <div class="max-w-3xl mx-auto bg-gray-800 rounded-lg overflow-hidden shadow-xl">
+                    <img src="${apod.url}" alt="${apod.title}" class="w-full h-48 sm:h-64 object-cover">
+                    <div class="p-4 sm:p-6">
+                        <h2 class="text-xl sm:text-2xl font-bold mb-2">${apod.title}</h2>
+                        <p class="text-sm text-gray-400 mb-4">${apod.date}</p>
+                        <p class="text-sm mb-4">${apod.explanation}</p>
+                        ${apod.copyright ? `<p class="text-xs text-gray-400">Copyright: ${apod.copyright}</p>` : ''}
+                    </div>
+                </div>
+            `;
+
+            apodContainer.innerHTML = content;
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            if (window.innerWidth < 640 && !sidebar.contains(event.target) && !menuToggle.contains(event.target)) {
+                sidebar.classList.remove('open');
+            }
+        });
+
+        // Fetch APOD for today on initial load
+        fetchAPOD();
+    </script>
+</body>
+</html>
